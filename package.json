@@ -1,0 +1,14 @@
+{
+  "name": "koskerotvirusov",
+  "version": "13.39.0",
+  "description": "Хакерский храм Кошкеротвирусов",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "cors": "^2.8.5"
+  }
+}

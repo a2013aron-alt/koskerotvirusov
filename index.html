@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>КОШКЕРОТВИРУСОВ • ХАКЕРСКИЙ ХРАМ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root {
+    --neon-green: #0f0;
+    --neon-purple: #f0f;
+    --dark-bg: #000;
+    --dark-panel: #0a0a0a;
+    --glow: 0 0 10px #0f0, 0 0 20px #0f0;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#000;
+    color:var(--neon-green);
+    font-family:'Courier New', monospace;
+    overflow-x:hidden;
+    min-height:100vh;
+    background-image: linear-gradient(rgba(0,255,0,0.02) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(0,255,0,0.02) 1px, transparent 1px);
+    background-size:40px 40px;
+  }
+  canvas { position:fixed; inset:0; z-index:1; opacity:0.12; pointer-events:none; }
+
+  header {
+    position:fixed;
+    top:0; left:0; right:0;
+    background:rgba(0,0,0,0.9);
+    border-bottom:1px solid #0f0;
+    padding:1.2rem;
+    text-align:center;
+    z-index:100;
+    text-shadow:var(--glow);
+    font-size:2.8rem;
+    letter-spacing:10px;
+  }
+
+  #search-bar {
+    margin:120px auto 40px;
+    width:90%; max-width:900px;
+  }
+  #search-input {
+    width:100%;
+    padding:1.4rem;
+    font-size:1.5rem;
+    background:#001100;
+    border:2px solid #0f0;
+    color:#0f0;
+    font-family:'Courier New';
+    box-shadow:0 0 20px #0f0 inset;
+  }
+
+  #virus-gallery {
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));
+    gap:2rem;
+    padding:0 5% 5rem;
+    max-width:1800px;
+    margin:0 auto;
+  }
+
+  .virus-card {
+    background:#001100;
+    border:1px solid #0f0;
+    border-radius:8px;
+    overflow:hidden;
+    transition:all 0.4s;
+    box-shadow:0 0 20px rgba(0,255,0,0.15);
+    cursor:pointer;
+  }
+  .virus-card:hover {
+    transform:translateY(-8px) scale(1.03);
+    box-shadow:0 0 40px #0f0;
+  }
+  .virus-preview {
+    width:100%; height:200px; object-fit:cover;
+    border-bottom:1px solid #0f0;
+    background:#000;
+  }
+  .virus-info {
+    padding:1.2rem;
+  }
+  .virus-title { font-size:1.5rem; margin-bottom:0.6rem; }
+  .virus-desc { font-size:1rem; opacity:0.8; line-height:1.4; }
+  .virus-tags { font-size:0.9rem; color:#0f8; margin:0.6rem 0; }
+  .virus-author { font-size:0.9rem; color:#0f8; text-align:right; font-style:italic; }
+
+  /* АДМИНКА */
+  #admin-panel {
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.97);
+    z-index:9999;
+    color:#0f0;
+    padding:2rem;
+    overflow-y:auto;
+  }
+  #admin-header {
+    font-size:3.5rem;
+    text-align:center;
+    margin-bottom:2rem;
+    text-shadow:0 0 30px #f0f;
+  }
+  #upload-zone {
+    border:3px dashed #0f0;
+    padding:4rem 2rem;
+    text-align:center;
+    margin:2rem 0;
+    cursor:pointer;
+    transition:all 0.3s;
+  }
+  #upload-zone:hover, #upload-zone.dragover {
+    border-color:#f0f;
+    background:rgba(0,255,0,0.05);
+  }
+  #admin-file-list {
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(340px, 1fr));
+    gap:1.5rem;
+  }
+  .admin-file-card {
+    background:#001100;
+    padding:1.2rem;
+    border:1px solid #0f0;
+    border-radius:6px;
+  }
+  button {
+    background:#003300;
+    color:#0f0;
+    border:1px solid #0f0;
+    padding:0.8rem 1.5rem;
+    font-family:'Courier New';
+    cursor:pointer;
+    margin:0.5rem;
+  }
+  button:hover { background:#004400; }
+</style>
+</head>
+<body>
+
+<canvas id="matrix"></canvas>
+
+<header>КОШКЕРОТВИРУСОВ</header>
+
+<div id="search-bar">
+  <input type="text" id="search-input" placeholder="ПОИСК ПО НАЗВАНИЮ / ОПИСАНИЮ / ТЕГАМ / РАЗРАБОТЧИКУ">
+</div>
+
+<div id="virus-gallery"></div>
+
+<!-- АДМИН-ПАНЕЛЬ -->
+<div id="admin-panel">
+  <div id="admin-header">АДМИНКА • УРОВЕНЬ 13.37</div>
+  
+  <div id="upload-zone">
+    <h2>ПЕРЕТАЩИТЕ ФАЙЛЫ СЮДА ИЛИ КЛИКНИТЕ</h2>
+    <p>ЛЮБОЕ расширение. Название, описание, теги, разработчик — укажете ниже</p>
+  </div>
+
+  <input type="file" id="file-input" multiple style="display:none;">
+
+  <div id="admin-file-list"></div>
+</div>
+
+<script>
+// =============================================
+// МАТРИЧНЫЙ ФОН
+// =============================================
+const canvas = document.getElementById('matrix');
+const ctx = canvas.getContext('2d');
+
+let w, h, columns, drops;
+
+function resizeMatrix() {
+  w = canvas.width = window.innerWidth;
+  h = canvas.height = window.innerHeight;
+  columns = Math.floor(w / 16);
+  drops = Array(columns).fill(1);
+}
+resizeMatrix();
+window.addEventListener('resize', resizeMatrix);
+
+function drawMatrix() {
+  ctx.fillStyle = 'rgba(0,0,0,0.04)';
+  ctx.fillRect(0,0,w,h);
+
+  ctx.fillStyle = '#0f0';
+  ctx.font = '16px monospace';
+
+  const chars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン'.split('');
+
+  for(let i=0; i<columns; i++){
+    const text = chars[Math.floor(Math.random()*chars.length)];
+    const x = i*16;
+    const y = drops[i]*16;
+
+    ctx.fillText(text, x, y);
+
+    if(y > h && Math.random() > 0.975) drops[i] = 0;
+    drops[i]++;
+  }
+}
+setInterval(drawMatrix, 35);
+
+// =============================================
+// СЕКРЕТНЫЙ КОД ДЛЯ АДМИНКИ: кошкерот
+// =============================================
+let secret = "";
+window.addEventListener('keydown', e => {
+  if(e.key.length === 1) {
+    secret += e.key.toLowerCase();
+    if(secret.length > 12) secret = secret.slice(-12);
+    if(secret.endsWith("кошкерот")) {
+      secret = "";
+      document.getElementById('admin-panel').style.display = 'block';
+      alert("ДОСТУП УРОВНЯ 13.37 ПОЛУЧЕН");
+      loadAdminViruses();
+    }
+  }
+});
+
+// =============================================
+// ЗАГРУЗКА ВИРУСОВ НА СЕРВЕР
+// =============================================
+const uploadZone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+
+uploadZone.onclick = () => fileInput.click();
+
+uploadZone.ondragover = e => {
+  e.preventDefault();
+  uploadZone.classList.add('dragover');
+};
+
+uploadZone.ondragleave = () => uploadZone.classList.remove('dragover');
+
+uploadZone.ondrop = e => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+};
+
+fileInput.onchange = e => handleFiles(e.target.files);
+
+async function handleFiles(files) {
+  for (const file of files) {
+    const name = prompt("НАЗВАНИЕ ВИРУСА:", file.name) || file.name;
+    const desc = prompt("ОПИСАНИЕ:", "Критическая угроза уровня 13.37") || "Критическая угроза уровня 13.37";
+    const tags = prompt("ТЕГИ (через запятую):", "троян,ransomware,backdoor") || "троян,ransomware,backdoor";
+    const author = prompt("РАЗРАБОТЧИК:", "Кошкерот") || "Кошкерот";
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('name', name);
+    formData.append('desc', desc);
+    formData.append('tags', tags);
+    formData.append('author', author);
+
+    try {
+      const res = await fetch('/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        console.log('Вирус загружен:', data.metadata);
+      } else {
+        alert('Ошибка загрузки');
+      }
+    } catch (err) {
+      alert('Ошибка: ' + err.message);
+    }
+  }
+  loadAdminViruses();
+}
+
+// =============================================
+// ПОЛУЧЕНИЕ СПИСКА ВИРУСОВ
+// =============================================
+async function loadGallery() {
+  try {
+    const res = await fetch('/viruses');
+    const data = await res.json();
+    renderGallery(data);
+  } catch (err) {
+    console.error('Ошибка загрузки галереи:', err);
+  }
+}
+
+async function loadAdminViruses() {
+  try {
+    const res = await fetch('/viruses');
+    const data = await res.json();
+    renderAdminList(data);
+  } catch (err) {
+    console.error('Ошибка загрузки админ-листа:', err);
+  }
+}
+
+function renderGallery(viruses) {
+  const gallery = document.getElementById('virus-gallery');
+  gallery.innerHTML = "";
+
+  viruses.forEach(v => {
+    const card = document.createElement('div');
+    card.className = 'virus-card';
+
+    card.innerHTML = `
+      <div class="virus-preview" style="background:#000 url('${v.preview || ''}') center/cover no-repeat;"></div>
+      <div class="virus-info">
+        <div class="virus-title">${v.name}</div>
+        <div class="virus-desc">${v.desc}</div>
+        <div class="virus-tags">Теги: ${v.tags}</div>
+        <div class="virus-author">Разработчик: ${v.author}</div>
+      </div>
+    `;
+
+    card.onclick = () => {
+      window.location.href = `/download/${v.filename}`;
+    };
+
+    gallery.appendChild(card);
+  });
+}
+
+function renderAdminList(viruses) {
+  const list = document.getElementById('admin-file-list');
+  list.innerHTML = "";
+
+  viruses.forEach(v => {
+    const card = document.createElement('div');
+    card.className = 'admin-file-card';
+    card.innerHTML = `
+      <strong>${v.name}</strong><br>
+      ${v.desc}<br>
+      Теги: ${v.tags}<br>
+      Автор: ${v.author}<br>
+      Файл: ${v.filename} • ${(v.size / 1024).toFixed(1)} KB • ${v.date}
+    `;
+    list.appendChild(card);
+  });
+}
+
+// Поиск
+const searchInput = document.getElementById('search-input');
+searchInput.oninput = async () => {
+  const res = await fetch('/viruses');
+  const data = await res.json();
+  const filtered = data.filter(v => {
+    const lower = searchInput.value.toLowerCase();
+    return v.name.toLowerCase().includes(lower) ||
+           v.desc.toLowerCase().includes(lower) ||
+           v.tags.toLowerCase().includes(lower) ||
+           v.author.toLowerCase().includes(lower);
+  });
+  renderGallery(filtered);
+};
+
+// Загрузка при старте
+loadGallery();
+</script>
+</body>
+</html>
